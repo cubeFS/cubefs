@@ -64,12 +64,10 @@ func (rs *RocksDBStore) Open(lruCacheSize, writeBufferSize int) error {
 func (rs *RocksDBStore) Del(key interface{}, isSync bool) (result interface{}, err error) {
 	ro := gorocksdb.NewDefaultReadOptions()
 	wo := gorocksdb.NewDefaultWriteOptions()
-	wb := gorocksdb.NewWriteBatch()
 	wo.SetSync(isSync)
 	defer func() {
 		wo.Destroy()
 		ro.Destroy()
-		wb.Destroy()
 	}()
 	slice, err := rs.db.Get(ro, []byte(key.(string)))
 	if err != nil {
