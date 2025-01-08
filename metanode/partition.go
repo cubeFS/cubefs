@@ -61,6 +61,7 @@ type sortedPeers []proto.Peer
 func (sp sortedPeers) Len() int {
 	return len(sp)
 }
+
 func (sp sortedPeers) Less(i, j int) bool {
 	return sp[i].ID < sp[j].ID
 }
@@ -404,7 +405,7 @@ func (uMgr *UidManager) getAllUidSpace() (rsp []*proto.UidReportSpaceInfo) {
 func (uMgr *UidManager) accumRebuildStart() bool {
 	uMgr.acLock.Lock()
 	defer uMgr.acLock.Unlock()
-	log.LogDebugf("accumRebuildStart vol [%v] mp[%v] rbuilding [%v]", uMgr.volName, uMgr.mpID, uMgr.rbuilding)
+	log.LogDebugf("accumRebuildStart vol [%v] mp[%v] rbuildbySnapshot [%v]", uMgr.volName, uMgr.mpID, uMgr.rbuilding)
 	if uMgr.rbuilding {
 		return false
 	}
@@ -427,7 +428,6 @@ func (uMgr *UidManager) accumRebuildFin(rebuild bool) {
 	uMgr.accumDelta = uMgr.accumRebuildDelta
 	uMgr.accumRebuildBase = new(sync.Map)
 	uMgr.accumRebuildDelta = new(sync.Map)
-
 }
 
 func (uMgr *UidManager) accumInoUidSize(ino *Inode, accum *sync.Map) {
@@ -508,9 +508,11 @@ func (mp *metaPartition) SetForbidden(status bool) {
 func (mp *metaPartition) acucumRebuildStart() bool {
 	return mp.uidManager.accumRebuildStart()
 }
+
 func (mp *metaPartition) acucumRebuildFin(rebuild bool) {
 	mp.uidManager.accumRebuildFin(rebuild)
 }
+
 func (mp *metaPartition) acucumUidSizeByStore(ino *Inode) {
 	mp.uidManager.accumInoUidSize(ino, mp.uidManager.accumRebuildBase)
 }
@@ -731,7 +733,7 @@ func (mp *metaPartition) startRaft() (err error) {
 func (mp *metaPartition) stopRaft() {
 	if mp.raftPartition != nil {
 		// TODO Unhandled errors
-		//mp.raftPartition.Stop()
+		// mp.raftPartition.Stop()
 	}
 	return
 }
@@ -886,10 +888,10 @@ func (mp *metaPartition) LoadSnapshot(snapshotPath string) (err error) {
 		return err
 	}
 
-	var loadFuncs = []func(rootDir string, crc uint32) error{
+	loadFuncs := []func(rootDir string, crc uint32) error{
 		mp.loadInode,
 		mp.loadDentry,
-		nil, //loading quota info from extend requires mp.loadInode() has been completed, so skip mp.loadExtend() here
+		nil, // loading quota info from extend requires mp.loadInode() has been completed, so skip mp.loadExtend() here
 		mp.loadMultipart,
 	}
 
@@ -899,7 +901,7 @@ func (mp *metaPartition) LoadSnapshot(snapshotPath string) (err error) {
 		return ErrSnapshotCrcMismatch
 	}
 
-	//handle compatibility in upgrade scenarios
+	// handle compatibility in upgrade scenarios
 	needLoadTxStuff := false
 	needLoadUniqStuff := false
 	if crc_count >= CRC_COUNT_TX_STUFF {
@@ -1000,7 +1002,7 @@ func (mp *metaPartition) store(sm *storeMsg) (err error) {
 		os.RemoveAll(tmpDir)
 	}
 	err = nil
-	if err = os.MkdirAll(tmpDir, 0775); err != nil {
+	if err = os.MkdirAll(tmpDir, 0o775); err != nil {
 		return
 	}
 
@@ -1010,8 +1012,8 @@ func (mp *metaPartition) store(sm *storeMsg) (err error) {
 			os.RemoveAll(tmpDir)
 		}
 	}()
-	var crcBuffer = bytes.NewBuffer(make([]byte, 0, 16))
-	var storeFuncs = []func(dir string, sm *storeMsg) (uint32, error){
+	crcBuffer := bytes.NewBuffer(make([]byte, 0, 16))
+	storeFuncs := []func(dir string, sm *storeMsg) (uint32, error){
 		mp.storeInode,
 		mp.storeDentry,
 		mp.storeExtend,
@@ -1043,7 +1045,7 @@ func (mp *metaPartition) store(sm *storeMsg) (err error) {
 	}
 
 	// write crc to file
-	if err = ioutil.WriteFile(path.Join(tmpDir, SnapshotSign), crcBuffer.Bytes(), 0775); err != nil {
+	if err = ioutil.WriteFile(path.Join(tmpDir, SnapshotSign), crcBuffer.Bytes(), 0o775); err != nil {
 		return
 	}
 	snapshotDir := path.Join(mp.config.RootDir, snapshotDir)
@@ -1117,7 +1119,8 @@ func (mp *metaPartition) GetBaseConfig() MetaPartitionConfig {
 
 // UpdatePartition updates the meta partition. TODO remove? no usage?
 func (mp *metaPartition) UpdatePartition(req *UpdatePartitionReq,
-	resp *UpdatePartitionResp) (err error) {
+	resp *UpdatePartitionResp,
+) (err error) {
 	reqData, err := json.Marshal(req)
 	if err != nil {
 		resp.Status = proto.TaskFailed
@@ -1370,7 +1373,7 @@ func (mp *metaPartition) storeSnapshotFiles() (err error) {
 }
 
 func (mp *metaPartition) startCheckerEvict() {
-	var timer = time.NewTimer(opCheckerInterval)
+	timer := time.NewTimer(opCheckerInterval)
 	for {
 		select {
 		case <-timer.C:
