@@ -211,6 +211,7 @@ func (s *Streamer) server() {
 			if atomic.LoadInt32(&s.refcnt) <= 0 {
 				if s.idle >= streamWriterIdleTimeoutPeriod && len(s.request) == 0 {
 					if s.client.disableMetaCache || !s.needBCache {
+						log.LogDebugf("Streamer server delete streamer %v", s)
 						delete(s.client.streamers, s.inode)
 						if s.client.evictIcache != nil {
 							s.client.evictIcache(s.inode)
@@ -992,12 +993,12 @@ func (s *Streamer) closeOpenHandler() (err error) {
 
 func (s *Streamer) open() {
 	atomic.AddInt32(&s.refcnt, 1)
-	log.LogDebugf("open: streamer(%v) refcnt(%v)", s, atomic.LoadInt32(&s.refcnt))
+	log.LogDebugf("open: streamer(%v)", s)
 }
 
 func (s *Streamer) release() error {
 	if atomic.AddInt32(&s.refcnt, -1) < 0 {
-		panic(fmt.Sprintf("streamer %v refCnt error", s.inode))
+		panic(fmt.Sprintf("streamer %v refCnt error", s))
 	}
 	err := s.closeOpenHandler()
 	if err != nil {
@@ -1009,12 +1010,14 @@ func (s *Streamer) release() error {
 
 func (s *Streamer) evict() error {
 	s.client.streamerLock.Lock()
+	log.LogDebugf("try evict %v", s)
 	if atomic.LoadInt32(&s.refcnt) > 0 || len(s.request) != 0 {
 		s.client.streamerLock.Unlock()
-		return errors.New(fmt.Sprintf("evict: streamer(%v) refcnt(%v)", s, atomic.LoadInt32(&s.refcnt)))
+		return errors.New(fmt.Sprintf("evict: streamer(%v)", s))
 	}
 	if s.client.disableMetaCache || !s.needBCache {
 		delete(s.client.streamers, s.inode)
+		log.LogDebugf("evict streamer %v", s)
 	}
 	s.client.streamerLock.Unlock()
 	return nil
