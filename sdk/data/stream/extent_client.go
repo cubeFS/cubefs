@@ -215,6 +215,7 @@ func (client *ExtentClient) evictStreamer() bool {
 		return true
 	}
 	if atomic.LoadInt32(&s.refcnt) <= 0 {
+		log.LogDebugf("evictStreamer streamer %v", s)
 		delete(s.client.streamers, s.inode)
 	}
 	return true
@@ -477,7 +478,7 @@ func (client *ExtentClient) EvictStream(inode uint64) error {
 		s.done <- struct{}{}
 		s.isOpen = false
 	} else {
-		log.LogDebugf("EvictStream %v", s.inode)
+		log.LogDebugf("EvictStream %v", s)
 		if atomic.LoadInt32(&s.refcnt) <= 0 {
 			delete(s.client.streamers, s.inode)
 		}
