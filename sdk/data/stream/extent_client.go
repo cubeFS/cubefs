@@ -214,8 +214,10 @@ func (client *ExtentClient) evictStreamer() bool {
 		client.streamerList.PushFront(ino)
 		return true
 	}
-
-	delete(s.client.streamers, s.inode)
+	if atomic.LoadInt32(&s.refcnt) <= 0 {
+		log.LogDebugf("evictStreamer streamer %v", s)
+		delete(s.client.streamers, s.inode)
+	}
 	return true
 }
 
@@ -420,6 +422,7 @@ func (client *ExtentClient) OpenStream(inode uint64) error {
 	if !ok {
 		s = NewStreamer(client, inode)
 		client.streamers[inode] = s
+		log.LogDebugf("OpenStreamWithCache input inode %v", s.inode)
 	}
 	return s.IssueOpenRequest()
 }
@@ -431,6 +434,7 @@ func (client *ExtentClient) OpenStreamWithCache(inode uint64, needBCache bool) e
 	if !ok {
 		s = NewStreamer(client, inode)
 		client.streamers[inode] = s
+		log.LogDebugf("OpenStreamWithCache input inode %v", s.inode)
 		if !client.disableMetaCache && needBCache {
 			client.streamerList.PushFront(inode)
 		}
@@ -474,7 +478,10 @@ func (client *ExtentClient) EvictStream(inode uint64) error {
 		s.done <- struct{}{}
 		s.isOpen = false
 	} else {
-		delete(s.client.streamers, s.inode)
+		log.LogDebugf("EvictStream %v", s)
+		if atomic.LoadInt32(&s.refcnt) <= 0 {
+			delete(s.client.streamers, s.inode)
+		}
 		s.client.streamerLock.Unlock()
 	}
 
